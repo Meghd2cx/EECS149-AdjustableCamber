@@ -125,6 +125,8 @@ float * updateIMUangAccel ()
       IMU_ang_accel[1] = y_dps;
       IMU_ang_accel[2] = z_dps;
 
+
+      //TODO: If implementing averaging filter, run function call here
       rollAngle = atan2(y_dps, z_dps) * (180.0 / M_PI);
 
       return IMU_ang_accel;
@@ -148,7 +150,9 @@ void populate_steering_data() {
      */
 
     // Update strValues with current LinPot steering data
+    //TODO: If implementing averaging filter, run function call here
     strPos = analogRead(STR_POS);
+
     for (int i = 0; i < (windowSize - 1); i++) {
       strValues[i] = strValues[i + 1];
     }

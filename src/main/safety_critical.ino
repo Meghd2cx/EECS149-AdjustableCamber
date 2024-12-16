@@ -22,9 +22,9 @@ bool linPotChecks() {
 
 bool IMUChecks() {
     // Null checks for IMU 
-    if (!IMU_ang_accel[0]) {return true;}
-    if (!IMU_ang_accel[0]) {return true;}
-    if (!IMU_ang_accel[0]) {return true;}
+    //TODO: Validate that this isn't necessarily true when just pulling data
+    if (ESP32Can.inRxQueue() == 0) {return true;}
+  
 
     // Roll Angle null checks
     if (!rollAngle) {return true;}

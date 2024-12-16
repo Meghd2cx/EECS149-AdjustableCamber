@@ -54,6 +54,9 @@ void setup() {
     // Initialize peripherals
     initialize_pinouts();
 
+    // Initialize IMU
+    setupIMU();
+
     // Set up button
     attachInterrupt(BTN, isr_btn, RISING);
 
@@ -105,15 +108,17 @@ void functionalIMUStateMachine() {
             break;
         case ENTRY_EXIT:
             camberAngle = computeDesiredActuationAngleWithIMU();
-            if (SteeringSteady()) {
-                currentState = APEX;
-            }
             if (CheckForButtonPress()) {
                 currentState = OFF;
+            }
+            if (SteeringSteady()) {
+                currentState = APEX;
+                break;
             }
             if (CheckIfStraight()) {
                 camberAngle = -0.5;
                 currentState = STRAIGHT;
+                break;
             }
             if (TurningLeft()) {
                 setLEDPIN(4);
@@ -123,11 +128,12 @@ void functionalIMUStateMachine() {
             break;
         case APEX:
             camberAngle = computeDesiredActuationAngleWithIMU();
-            if (ReturningToStraight()) {
-                currentState = ENTRY_EXIT;
-            }
             if (CheckForButtonPress()) {
                 currentState = OFF;
+            }
+            if (ReturningToStraight()) {
+                currentState = ENTRY_EXIT;
+                break;
             }
             break;
         case ERROR:
