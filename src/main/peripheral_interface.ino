@@ -14,6 +14,7 @@
 #define LED_STRAIGHT_RED 14
 #define LED_LEFT_YELLOW 20
 #define LED_LEFT_GREEN 22
+#define NUM_SAMPLES_ROLL 10
 
 
 // Steering Constants & Variables
@@ -32,13 +33,18 @@ float x_g = 0;
 float y_g = 0;
 float z_g = 0;
 float IMU_ang_accel[3] = {0, 0, 0}; //Stores in degrees per second
+float rollAngleBuffer[NUM_SAMPLES_ROLL] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 unsigned long receivedRollTime = 0;
+int bufferIndex = 0;
+int sampleCount = 0;
+
 
 // IMU data variables
 float angularVelocityx = 0;
-float angularAccelx = 0;
 float rollAngle = 0;
-unsigned long prevRollTime = 0;
+float rollAngleGyro = 0;
+float rollAngleAccel = 0;
+float prevRollTime = 0;
 
 // Motor Control constants
 const int freq = 5000;
@@ -125,12 +131,17 @@ float * updateIMUangAccel ()
       IMU_ang_accel[1] = y_dps;
       IMU_ang_accel[2] = z_dps;
 
-      unsigned long currentTime = millis();
+      // Addressing floating
+      if (x_dps < 2) {x_dps = 0;}
+
+      float currentTime = millis();
       float delta_t = (currentTime - prevRollTime) / 1000;
       prevRollTime = currentTime;
+      
+      rollAngleGyro += (y_dps + 0.3) * delta_t;
 
-      rollAngle += x_dps * delta_t;
-      Serial.println(x_dps);
+      // Serial.println(rollAngle);
+      // Serial.println(y_dps);
 
       return IMU_ang_accel;
     }
@@ -154,11 +165,10 @@ float * updateIMUAccel ()
       IMU_accel[0] = x_g;
       IMU_accel[1] = y_g;
       IMU_accel[2] = z_g;
-      Serial.println(x_g);
+      // Serial.println(x_g);
 
       //TODO: If implementing averaging filter, run function call here
-      // rollAngle = -atan2(y_g, sqrt(x_g * x_g + z_g * z_g)) * (180 / M_PI);
-      // receivedRollTime = millis();
+      rollAngleAccel = -atan2(y_g, sqrt(x_g * x_g + z_g * z_g)) * (180 / M_PI);
 
       return IMU_accel;
     }

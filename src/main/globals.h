@@ -31,6 +31,8 @@ extern int theta;
 extern int strPos;
 extern int strSpeed;
 extern float rollAngle;
+extern float rollAngleGyro;
+extern float rollAngleAccel;
 
 // Desired Camber Angles
 double straightCamber = 0;

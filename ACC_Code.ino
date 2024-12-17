@@ -1,13 +1,6 @@
 #include <Arduino.h>
+#include <peripheral_interface.ino>
 #include <ESP32Encoder.h>
-
-#define M1_IN_A 12
-#define M1_IN_B 27
-#define M1_PWM 33
-#define M1_SENSOR_A 25
-#define M1_SENSOR_B 34
-#define STR_POS 26      
-#define BTN 4
 
 ESP32Encoder encoder;
 
@@ -16,7 +9,8 @@ enum State{
   OFF,
   STRAIGHT,
   ENTRY_EXIT,
-  APEX
+  APEX,
+  ERROR
 } currentState = OFF;
 bool ACC_Enable = false;
 
@@ -24,10 +18,6 @@ bool ACC_Enable = false;
 const int straightOffset = 2047;
 const int maxStraightError = 500;
 const double maxSteadyError = 10;
-int strPos = 0;
-const int windowSize = 5;
-int strValues[windowSize];
-double strSpeed = 0;
 
 // Desired Camber Angles
 double straightCamber = -0.5;
@@ -83,55 +73,26 @@ void IRAM_ATTR onTime0() {
 
 void setup() {
   // Put your setup code here, to run once:
-  Serial.begin(115200);
-
-  pinMode(M1_IN_A, OUTPUT);
-  pinMode(M1_IN_B, OUTPUT);
-  digitalWrite(M1_IN_A, LOW);   // Set initial state of motor to off
-  digitalWrite(M1_IN_B, LOW);
-  pinMode(M1_PWM, OUTPUT);
-  pinMode(M1_SENSOR_A, INPUT);
-  pinMode(M1_SENSOR_B, INPUT);
-  pinMode(STR_POS, INPUT);
-
-  ESP32Encoder::useInternalWeakPullResistors = puType::up; // Enable the weak pull up resistors
-  encoder.attachHalfQuad(M1_SENSOR_A, M1_SENSOR_B); // Attach pins for use as encoder pins
-  encoder.setCount(0);  // Set starting count value after attaching
-
-  // Attach channel to GPIO pin
-  ledcAttach(M1_IN_A, freq, resolution);
-  ledcAttach(M1_IN_B, freq, resolution);
-  ledcAttach(M1_PWM, freq, resolution);
-
-  // Set up button
-  attachInterrupt(BTN, isr_btn, RISING);
+  initialize_pinouts();
 
   // Initilize timers
   timer0 = timerBegin(timerFreq);  // timer 0
   timerAttachInterrupt(timer0, &onTime0); // edge (not level) triggered
   timerAlarm(timer0, alarmFreq, true, 0); // autoreload enabled, infinite reloads
 
-  // Initialize steering values array
-  for (int i = 0; i < windowSize; i++) {
-    strValues[i] = 0;
-  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  populate_steering_data();
+
   if (deltaT) {
     portENTER_CRITICAL(&timerMux0);
     deltaT = false;
     portEXIT_CRITICAL(&timerMux0);
 
-    // Get steering angle and update array of last 10 steering values
-    strPos = analogRead(STR_POS);
-    for (int i = 0; i < (windowSize - 1); i++) {
-      strValues[i] = strValues[i+1];
-    }
-    strValues[windowSize-1] = strPos;
-    updateSteeringSpeed();
 
+    run
     // State Machine Logic
     switch (currentState) {
       case OFF:

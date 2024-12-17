@@ -31,6 +31,7 @@ hw_timer_t* timer0 = NULL;
 portMUX_TYPE timerMux0 = portMUX_INITIALIZER_UNLOCKED;
 const int timerFreq = 1000000;  // 1 us / 1MHz
 const int alarmFreq = 100000;   // 10,000 * 1 us = 10 ms
+const float GyroConstant = 0.93;
 
 // Interrupt Services
 void IRAM_ATTR isr_btn() {  // the function to be called when interrupt is triggered
@@ -91,7 +92,11 @@ void loop() {
 
         // // Popualte steering and IMU data
         populate_steering_data();
-        updateIMUangAccel();
+        // updateIMUangAccel();
+        // updateIMUAccel();
+
+        // rollAngle = (GyroConstant) * rollAngleGyro + (1 - GyroConstant) * rollAngleAccel;
+        // Serial.println(rollAngle);
 
         // // Run all safety checks, updates IMU status  
         run_all_safety_checks();
