@@ -2,9 +2,6 @@
 #include <ESP32Encoder.h>
 #include <ESP32-TWAI-CAN.hpp>
 #include "globals.h"
-// #include "peripheral_interface.ino"
-// #include "motor_control.ino"
-// #include "safety_critical.ino"
 
 
 // State Machine States
@@ -55,12 +52,12 @@ void setup() {
     initialize_pinouts();
 
     // Initialize IMU
-    setupIMU();
+    // setupIMU();
 
-    // Set up button
+    // // Set up button
     attachInterrupt(BTN, isr_btn, RISING);
 
-    // Initilize timers
+    // // Initilize timers
     timer0 = timerBegin(timerFreq);          // timer 0
     timerAttachInterrupt(timer0, &onTime0);  // edge (not level) triggered
     timerAlarm(timer0, alarmFreq, true, 0);  // autoreload enabled, infinite reloads
@@ -72,11 +69,11 @@ void loop() {
         deltaT = false;
         portEXIT_CRITICAL(&timerMux0);
 
-        // Popualte steering and IMU data
+        // // Popualte steering and IMU data
         populate_steering_data();
         updateIMUangAccel();
 
-        // Run all safety checks, updates IMU status
+        // // Run all safety checks, updates IMU status  
         run_all_safety_checks();
 
         switch(currentIMUState) {
@@ -91,14 +88,15 @@ void loop() {
 void functionalIMUStateMachine() {
     switch(currentState) {
         case OFF:
+            camberAngle = 0;
             if (CheckForButtonPress()) {
-                camberAngle = -0.5;
+                camberAngle = 0;
                 currentState = STRAIGHT;
             }        
             setLEDPIN(0);
             break;
         case STRAIGHT:
-            camberAngle = -0.5;
+            camberAngle = 0;
             if (!CheckIfStraight()) {
                 currentState = ENTRY_EXIT;
             }
@@ -116,7 +114,7 @@ void functionalIMUStateMachine() {
                 break;
             }
             if (CheckIfStraight()) {
-                camberAngle = -0.5;
+                camberAngle = 0;
                 currentState = STRAIGHT;
                 break;
             }
@@ -131,13 +129,13 @@ void functionalIMUStateMachine() {
             if (CheckForButtonPress()) {
                 currentState = OFF;
             }
-            if (ReturningToStraight()) {
+            if (!SteeringSteady() && ReturningToStraight()) {
                 currentState = ENTRY_EXIT;
                 break;
             }
             break;
         case ERROR:
-            camberAngle = -0.5;
+            camberAngle = 0;
             controlMotor(camberAngle);
     }
 
@@ -149,8 +147,8 @@ void functionalIMUStateMachine() {
 void fallBackStateMachine() {
     switch (currentState) {
         case OFF:
+            camberAngle = 0;
             if (CheckForButtonPress()) {
-                camberAngle = -0.5;
                 currentState = STRAIGHT;
             }
             setLEDPIN(0);
@@ -171,7 +169,7 @@ void fallBackStateMachine() {
                 currentState = APEX;
             }
             if (CheckIfStraight()) {
-                camberAngle = -0.5;
+                camberAngle = 0;
                 currentState = STRAIGHT;
             }
             if (CheckForButtonPress()) {
@@ -184,7 +182,7 @@ void fallBackStateMachine() {
             }
             break;
         case APEX:
-            if (ReturningToStraight()) {
+            if (!SteeringSteady() && ReturningToStraight()) {
                 camberAngle = (TurningLeft()) ? eLeft : eRight;
                 currentState = ENTRY_EXIT;
             }
@@ -198,7 +196,7 @@ void fallBackStateMachine() {
             }
             break;
         case ERROR: //TERMINAL STATE, NO BREAK
-            camberAngle = -0.5;
+            camberAngle = 0;
             controlMotor(camberAngle);
 
     }

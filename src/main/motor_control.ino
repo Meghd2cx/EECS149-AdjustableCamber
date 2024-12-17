@@ -7,8 +7,8 @@
 
 // Motor Variables
 const int thetaMax = 8400;  // encoder counts per 1 revolution of output shaft
-int a = -80;          // encoder ticks per angle // TODO
-int b = 1900;         // encoder ticks for zero  // TODO
+int a = -120;          // encoder ticks per angle // TODO
+int b = 2048;         // encoder ticks for zero  // TODO
 int thetaDes = 0;
 int error = 0;
 int sumError = 0;
@@ -30,8 +30,6 @@ double X;
 
 
 // PWM Properties
-const int freq = 5000;
-const int resolution = 8;
 const int MAX_PWM_VOLTAGE = 255;
 const int NOM_PWM_VOLTAGE = 150;
 
@@ -51,12 +49,12 @@ int computeDesiredActuationAngleWithIMU() {
      * 1. rollAngle < 15 : no negative compensation
      * 2. 15 <= rollAngle < 30 : negative compensation required, such that entry actuation ranges from [0, 3] and 
      *                           apex actuation ranges from [3, 6]
-     * 3. 30 <= rollAngle: extreme negative compensation required, -0.5 degrees. 
+     * 3. 30 <= rollAngle: extreme negative compensation required, 0 degrees. 
     */
     int desiredCamberAngle = 0;
 
     if (currentState == STRAIGHT) {
-        desiredCamberAngle = -0.5;
+        desiredCamberAngle = 0;
     }
 
     else if (currentState == ENTRY_EXIT) 
@@ -71,8 +69,8 @@ int computeDesiredActuationAngleWithIMU() {
             int compensation = compPerDegreeBank * (rollAngle - 15);
             desiredCamberAngle = (TurningLeft()) ? eLeft + compensation : eRight - compensation;
         }
-        else if (rollAngle > 30) { // extreme compensation, results in -0.5 
-            desiredCamberAngle = -0.5;
+        else if (rollAngle > 30) { // extreme compensation, results in 0 
+            desiredCamberAngle = 0;
         }
     }
     else if (currentState == APEX) 
@@ -86,8 +84,8 @@ int computeDesiredActuationAngleWithIMU() {
             int compensation = compPerDegreeBank * (rollAngle - 15);
             desiredCamberAngle = (TurningLeft()) ? apexLeft + compensation : apexRight - compensation;
         }
-        else if (30 <= rollAngle) { // extreme compensation, results in -0.5 
-            desiredCamberAngle = -0.5;
+        else if (30 <= rollAngle) { // extreme compensation, results in 0 
+            desiredCamberAngle = 0;
         }
     }
 
@@ -101,7 +99,7 @@ int computeDesiredActuationAngleWithIMU() {
     return desiredCamberAngle;
 }
 
-void controlMotor(int desiredActuationAngle) {
+void controlMotor(double desiredActuationAngle) {
   // Update theta from encoder count delta
   theta += count;
   // Convert desired camber angle to desired theta
@@ -125,17 +123,26 @@ void controlMotor(int desiredActuationAngle) {
     sumError -= error;
   }
 
+  if (currentState == OFF) {
+    ledcWrite(M1_IN_A, LOW);
+    ledcWrite(M1_IN_B, LOW);
+    ledcWrite(M1_PWM, 0);
+    return;
+  }
+
   // Map X to motor direction
   if (X > 0) {
     ledcWrite(M1_IN_A, LOW);
     ledcWrite(M1_IN_B, MAX_PWM_VOLTAGE);
+    ledcWrite(M1_PWM, X);
   } else if (X < 0) {
     ledcWrite(M1_IN_A, MAX_PWM_VOLTAGE);
     ledcWrite(M1_IN_B, LOW);
+    ledcWrite(M1_PWM, -X);
   } else {
     ledcWrite(M1_IN_A, LOW);
     ledcWrite(M1_IN_B, LOW);
+    ledcWrite(M1_PWM, 0);
   }
-  ledcWrite(M1_PWM, X);
   lastError = error;
 }

@@ -16,7 +16,7 @@ enum State {
   STRAIGHT,
   ENTRY_EXIT,
   APEX,
-  ERROR
+  ERROR,
 };
 
 enum IMUState {
