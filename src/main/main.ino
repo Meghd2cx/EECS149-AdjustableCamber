@@ -3,6 +3,10 @@
 #include <ESP32-TWAI-CAN.hpp>
 #include "globals.h"
 
+#define CAN_TX 8
+#define CAN_RX 4
+CanFrame rxFrame;
+
 
 // State Machine States
 State currentState = OFF;
@@ -52,7 +56,23 @@ void setup() {
     initialize_pinouts();
 
     // Initialize IMU
-    // setupIMU();
+    // Set pins
+    ESP32Can.setPins(CAN_TX, CAN_RX);
+
+    // You can set custom size for the queues - those are default
+    ESP32Can.setRxQueueSize(5);
+    ESP32Can.setTxQueueSize(5);
+
+    // .setSpeed() and .begin() functions require to use TwaiSpeed enum,
+    // but you can easily convert it from numerical value using .convertSpeed()
+    ESP32Can.setSpeed(ESP32Can.convertSpeed(1000));
+
+    // You can also just use .begin()..
+    if (ESP32Can.begin()) {
+      Serial.println("CAN bus started!");
+    } else {
+      Serial.println("CAN bus failed!");
+    }
 
     // // Set up button
     attachInterrupt(BTN, isr_btn, RISING);
@@ -111,12 +131,10 @@ void functionalIMUStateMachine() {
             }
             if (SteeringSteady()) {
                 currentState = APEX;
-                break;
             }
             if (CheckIfStraight()) {
                 camberAngle = 0;
                 currentState = STRAIGHT;
-                break;
             }
             if (TurningLeft()) {
                 setLEDPIN(4);
@@ -132,6 +150,11 @@ void functionalIMUStateMachine() {
             if (!SteeringSteady() && ReturningToStraight()) {
                 currentState = ENTRY_EXIT;
                 break;
+            }
+            if (TurningLeft()) {
+                setLEDPIN(5);
+            } else {
+                setLEDPIN(1);
             }
             break;
         case ERROR:

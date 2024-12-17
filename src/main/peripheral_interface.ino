@@ -8,17 +8,13 @@
 #include <math.h>
 
 #define STR_POS 26
-#define BTN 4
+#define BTN 39
 #define LED_RIGHT_GREEN 15
 #define LED_RIGHT_YELLOW 32
 #define LED_STRAIGHT_RED 14
 #define LED_LEFT_YELLOW 20
 #define LED_LEFT_GREEN 22
 
-// Default for ESP32
-#define CAN_TX 5
-#define CAN_RX 4
-CanFrame rxFrame;
 
 // Steering Constants & Variables
 const int straightOffset = 2047;
@@ -36,8 +32,13 @@ float x_g = 0;
 float y_g = 0;
 float z_g = 0;
 float IMU_ang_accel[3] = {0, 0, 0}; //Stores in degrees per second
-float rollAngle = 0;
 unsigned long receivedRollTime = 0;
+
+// IMU data variables
+float angularVelocityx = 0;
+float angularAccelx = 0;
+float rollAngle = 0;
+unsigned long prevRollTime = 0;
 
 // Motor Control constants
 const int freq = 5000;
@@ -104,22 +105,6 @@ void initialize_pinouts() {
   digitalWrite(LED_LEFT_GREEN, LOW);
 }
 
-bool setupIMU() {
-  // Set pins
-  ESP32Can.setPins(CAN_TX, CAN_RX);
-
-  ESP32Can.setRxQueueSize(5);
-  ESP32Can.setTxQueueSize(5);
-
-  ESP32Can.setSpeed(ESP32Can.convertSpeed(1000));
-
-  if (ESP32Can.begin()) {
-    Serial.println("CAN bus started!");
-  } else {
-    Serial.println("CAN bus failed!");
-  }
-}
-
 /*
 * Retrives IMU Angular acceleration data and stores in array. Returns array address if succcessful and NULL otherwise.
 */
@@ -139,6 +124,13 @@ float * updateIMUangAccel ()
       IMU_ang_accel[0] = x_dps;
       IMU_ang_accel[1] = y_dps;
       IMU_ang_accel[2] = z_dps;
+
+      unsigned long currentTime = millis();
+      float delta_t = (currentTime - prevRollTime) / 1000;
+      prevRollTime = currentTime;
+
+      rollAngle += x_dps * delta_t;
+      Serial.println(x_dps);
 
       return IMU_ang_accel;
     }
@@ -162,10 +154,11 @@ float * updateIMUAccel ()
       IMU_accel[0] = x_g;
       IMU_accel[1] = y_g;
       IMU_accel[2] = z_g;
+      Serial.println(x_g);
 
       //TODO: If implementing averaging filter, run function call here
-      rollAngle = -atan2(y_g, sqrt(x_g * x_g + z_g * z_g)) * (180 / M_PI);
-      receivedRollTime = millis();
+      // rollAngle = -atan2(y_g, sqrt(x_g * x_g + z_g * z_g)) * (180 / M_PI);
+      // receivedRollTime = millis();
 
       return IMU_accel;
     }
@@ -175,8 +168,6 @@ float * updateIMUAccel ()
     return NULL; //No data available
   }
 }
-
-
 
 // Populate variables associated with steering
 void populate_steering_data() {
