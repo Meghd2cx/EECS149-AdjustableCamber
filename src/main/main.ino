@@ -76,7 +76,7 @@ void setup() {
     }
 
     // // Set up button
-    attachInterrupt(BTN, isr_btn, RISING);
+    // attachInterrupt(BTN, isr_btn, RISING);
 
     // // Initilize timers
     timer0 = timerBegin(timerFreq);          // timer 0
@@ -92,9 +92,8 @@ void loop() {
 
         // // Popualte steering and IMU data
         populate_steering_data();
-        updateIMUangAccel();
-        // rollAngle = rollAngleGyro;
-        // updateIMUAccel();
+        updateIMUAccel();
+        rollAngle = rollAngleGyro;
 
         // rollAngle = (GyroConstant) * rollAngleGyro + (1 - GyroConstant) * rollAngleAccel;
         // Serial.println(rollAngle);
@@ -105,8 +104,10 @@ void loop() {
         switch(currentIMUState) {
             case(FUNCTIONAL):
                 functionalIMUStateMachine();
+                break;
             case(FALL_BACK):
                 fallBackStateMachine();
+                break;
         }
     }
 }
@@ -116,7 +117,6 @@ void functionalIMUStateMachine() {
         case OFF:
             camberAngle = 0;
             if (CheckForButtonPress()) {
-                camberAngle = 0;
                 currentState = STRAIGHT;
             }        
             setLEDPIN(0);
@@ -129,18 +129,19 @@ void functionalIMUStateMachine() {
             if (CheckForButtonPress()) {
                 currentState = OFF;
             }
+            setLEDPIN(3);
             break;
         case ENTRY_EXIT:
             camberAngle = computeDesiredActuationAngleWithIMU();
-            if (CheckForButtonPress()) {
-                currentState = OFF;
-            }
             if (SteeringSteady()) {
                 currentState = APEX;
             }
             if (CheckIfStraight()) {
                 camberAngle = 0;
                 currentState = STRAIGHT;
+            }
+            if (CheckForButtonPress()) {
+                currentState = OFF;
             }
             if (TurningLeft()) {
                 setLEDPIN(4);
@@ -150,12 +151,12 @@ void functionalIMUStateMachine() {
             break;
         case APEX:
             camberAngle = computeDesiredActuationAngleWithIMU();
-            if (CheckForButtonPress()) {
-                currentState = OFF;
-            }
             if (!SteeringSteady() && ReturningToStraight()) {
                 currentState = ENTRY_EXIT;
                 break;
+            }
+            if (CheckForButtonPress()) {
+                currentState = OFF;
             }
             if (TurningLeft()) {
                 setLEDPIN(5);
@@ -166,6 +167,7 @@ void functionalIMUStateMachine() {
         case ERROR:
             camberAngle = 0;
             controlMotor(camberAngle);
+            while (true) {;}
     }
 
     controlMotor(camberAngle);
@@ -227,6 +229,7 @@ void fallBackStateMachine() {
         case ERROR: //TERMINAL STATE, NO BREAK
             camberAngle = 0;
             controlMotor(camberAngle);
+            while (true) {;}
 
     }
 

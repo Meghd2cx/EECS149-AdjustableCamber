@@ -2,8 +2,8 @@
 #include <globals.h>
 #include <math.h>
 
-#define MAX_CAMBER 6           // Maximum allowable camber angle in degrees
-#define MIN_CAMBER -1           // Minimum allowable camber angle in degrees
+// #define MAX_CAMBER 6           // Maximum allowable camber angle in degrees
+// #define MIN_CAMBER -6           // Minimum allowable camber angle in degrees
 
 // Motor Variables
 const int thetaMax = 8400;  // encoder counts per 1 revolution of output shaft
@@ -41,7 +41,7 @@ double compPerDegreeBank = -0.2;
 int theta = 0;
 
 // Function to compute the desired camber actuation
-int computeDesiredActuationAngleWithIMU() {
+double computeDesiredActuationAngleWithIMU() {
     /** Compute desired actuation angle with IMU data 
      * Banked turns require LESS active camber control
      * In the flat surface case, actuation is 3 degrees on turn entry and 6 degrees on APEX
@@ -51,7 +51,7 @@ int computeDesiredActuationAngleWithIMU() {
      *                           apex actuation ranges from [3, 6]
      * 3. 30 <= rollAngle: extreme negative compensation required, 0 degrees. 
     */
-    int desiredCamberAngle = 0;
+    double desiredCamberAngle = 0;
 
     if (currentState == STRAIGHT) {
         desiredCamberAngle = 0;
@@ -59,32 +59,34 @@ int computeDesiredActuationAngleWithIMU() {
 
     else if (currentState == ENTRY_EXIT) 
     {
-        if (rollAngle < 15) { // no negative compensation 
+        if (abs(rollAngle) < 15) { // no negative compensation 
             desiredCamberAngle = (TurningLeft()) ? eLeft : eRight;
         }
 
-        else if (15 <= rollAngle < 30) { 
+        else if (15 <= abs(rollAngle) < 30) { 
             // Compensation, results in 0 < desiredCamberAngle < 3. 
             // e.g. rollAngle = 18, compensation = 0.6 degrees, desiredCamberAngle = eLeft - 0.6
-            int compensation = compPerDegreeBank * (rollAngle - 15);
+            double compensation = compPerDegreeBank * (((double) abs(rollAngle)) - 15);
+            Serial.println(compensation);
             desiredCamberAngle = (TurningLeft()) ? eLeft + compensation : eRight - compensation;
         }
-        else if (rollAngle > 30) { // extreme compensation, results in 0 
+        else if (abs(rollAngle) > 30) { // extreme compensation, results in 0 
             desiredCamberAngle = 0;
         }
     }
     else if (currentState == APEX) 
     {
-        if (rollAngle < 15) { // no negative compensation 
-            desiredCamberAngle = (TurningLeft()) ? eLeft + compPerDegreeBank  : eRight;
+        if (abs(rollAngle) < 15) { // no negative compensation 
+            desiredCamberAngle = (TurningLeft()) ? apexLeft : apexRight;
         }
-        else if (15 <= rollAngle <= 30) { 
+        else if (15 <= abs(rollAngle) <= 30) { 
             // Compensation, results in 3 < desiredCamberAngle < 6. 
             // e.g. rollAngle = 18, compensation = 0.6 degrees, desiredCamberAngle = apexLeft - 0.6
-            int compensation = compPerDegreeBank * (rollAngle - 15);
+            double compensation = compPerDegreeBank * (((double) abs(rollAngle)) - 15);
+            Serial.println(compensation);
             desiredCamberAngle = (TurningLeft()) ? apexLeft + compensation : apexRight - compensation;
         }
-        else if (30 <= rollAngle) { // extreme compensation, results in 0 
+        else if (30 <= abs(rollAngle)) { // extreme compensation, results in 0 
             desiredCamberAngle = 0;
         }
     }

@@ -62,6 +62,6 @@ void run_all_safety_checks() {
     if (linPotError) {currentState = ERROR;}
 
     // Change to fallback SM if IMU error encountered
-    // if (IMUError) {currentIMUState = FALL_BACK;}
-    currentIMUState = FALL_BACK;
+    if (IMUError) {currentIMUState = FALL_BACK;}
+    // currentIMUState = FALL_BACK;
 }

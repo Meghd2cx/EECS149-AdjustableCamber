@@ -42,5 +42,7 @@ double apexLeft = 6;
 double apexRight = -6;
 double camberAngle = 0;
 double desiredCamberAngle = straightCamber;
+const double MAX_CAMBER = 6;
+const double MIN_CAMBER = -6;
 
 #endif  // End of include guard
