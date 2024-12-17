@@ -4,11 +4,12 @@
 
 #include <ESP32Encoder.h>
 #include <ESP32-TWAI-CAN.hpp>
+#include <stdlib.h>
+#include <stdio.h>
 #include <globals.h>
 #include <math.h>
 
 #define STR_POS 26
-#define BTN 39
 #define LED_RIGHT_GREEN 15
 #define LED_RIGHT_YELLOW 32
 #define LED_STRAIGHT_RED 14
@@ -22,8 +23,8 @@ const int straightOffset = 2047;
 const int maxStraightError = 500;
 const double maxSteadyError = 70;
 const double minSteadyError = 0;
-const int windowSize = 5;
-int strValues[windowSize];
+const int windowSizeTurn = 5;
+int strValues[windowSizeTurn];
 
 // Global Variables
 int strPos = 0;
@@ -38,13 +39,31 @@ unsigned long receivedRollTime = 0;
 int bufferIndex = 0;
 int sampleCount = 0;
 
+// IMU Correction variables
+// float sum = 0.0;
+const int windowSize = 10; // Number of data points to average 
+float dataPoints[windowSize]; // Array to hold the data points 
+int currentIndex = 0; // Current index in the dataPoints array 
+float sum = 0;
+float prevRollTime = 0.0;
+
+int constantRollAngleSteps = 0; //Number of steps where the gyro angle has stayed the same
+float prevAngleGyro = 0.0; //Saves previous angle gyro
+float angleGyroStraightError = 0.05; //Max deviation before considering the change in gyro to be an actual change, not drift
+
+float angleGyroCorrectionAmt = 0.25; //Amount to corrrect by in case of constant gyro angle
+float angleGyroCorrectionHigh = 0.01;
+float angleGyroCorrectionLow = 0.005;
+float angleGyroCorrectionThreshold = 10; //Threshold to switch between low and high correction
+
+const int maxConstantRollAngleSteps = 2000/10;
+
 
 // IMU data variables
 float angularVelocityx = 0;
 float rollAngle = 0;
 float rollAngleGyro = 0;
 float rollAngleAccel = 0;
-float prevRollTime = 0;
 
 // Motor Control constants
 const int freq = 5000;
@@ -86,7 +105,7 @@ void initialize_pinouts() {
   attachInterrupt(BTN, isr_btn, RISING);
 
   // Initialize steering angle array with 0's
-    for (int i = 0; i < windowSize; i++) {
+    for (int i = 0; i < windowSizeTurn; i++) {
         strValues[i] = 0;
     }
 
@@ -116,8 +135,20 @@ void initialize_pinouts() {
 */
 float * updateIMUangAccel ()
 {
+  static uint32_t lastStamp = 0;
+  uint32_t currentStamp = millis();
+
+  // You can set custom timeout, default is 1000
   if (ESP32Can.readFrame(rxFrame, 1000)) {
-    if (rxFrame.identifier == 0x4EC) {  
+    // Comment out if too many frames
+    // Serial.printf("Received frame: %03X  \r\n", rxFrame.identifier);
+
+    bool show_accel = false;
+    bool show_angl_accel = true;
+
+    //Read raw degrees per second value
+    if (show_angl_accel && rxFrame.identifier == 0x4EC) {  // Standard OBD2 frame responce ID
+      // printf("DATA 0: %#010x 1: %#010x \n  ", rxFrame.data[2], rxFrame.data[3]);
       int16_t r_x_dps = rxFrame.data[1] | (rxFrame.data[0] << 8);
       int16_t r_y_dps = rxFrame.data[3] | (rxFrame.data[2] << 8);
       int16_t r_z_dps = rxFrame.data[5] | (rxFrame.data[4] << 8);
@@ -127,25 +158,11 @@ float * updateIMUangAccel ()
       float y_dps = r_y_dps * 0.1;
       float z_dps = r_z_dps * 0.1;
 
-      IMU_ang_accel[0] = x_dps;
-      IMU_ang_accel[1] = y_dps;
-      IMU_ang_accel[2] = z_dps;
-
-      // Addressing floating
-      if (x_dps < 2) {x_dps = 0;}
-
-      float currentTime = millis();
-      float delta_t = (currentTime - prevRollTime) / 1000;
-      prevRollTime = currentTime;
-      
-      rollAngleGyro += (y_dps + 0.3) * delta_t;
-
-      // Serial.println(rollAngle);
-      // Serial.println(y_dps);
-
-      return IMU_ang_accel;
+      // processYAngle(y_dps);
     }
   }
+
+  delay(10);  // wait for a second
 }
 
 float * updateIMUAccel ()
@@ -192,17 +209,17 @@ void populate_steering_data() {
     //TODO: If implementing averaging filter, run function call here
     strPos = analogRead(STR_POS);
 
-    for (int i = 0; i < (windowSize - 1); i++) {
+    for (int i = 0; i < (windowSizeTurn - 1); i++) {
       strValues[i] = strValues[i + 1];
     }
-    strValues[windowSize - 1] = strPos;
+    strValues[windowSizeTurn - 1] = strPos;
 
     // Compute and update strSpeed 
     double sum = 0;
-    for (int i = 0; i < (windowSize - 1); i++) {
+    for (int i = 0; i < (windowSizeTurn - 1); i++) {
       sum += double(strValues[i + 1] - strValues[i]) * (timerFreq / alarmFreq);
     }
-    strSpeed = sum / (windowSize - 1);
+    strSpeed = sum / (windowSizeTurn - 1);
 }
 
 // Calculate Steering Speed
@@ -334,4 +351,102 @@ const char* IMUstateToString(IMUState state) {
     case FALL_BACK: return "FALL_BACK";
     case FUNCTIONAL: return "FUNCTIONAL";
   }
+}
+
+
+
+// Applies drift corrections to roll.
+// Using Y axis to compute roll. 
+void processYAngle(float YAxisRate)
+{
+  Serial.println("1");
+
+  // Update the sum by subtracting the oldest value and adding the new value 
+  sum = sum - dataPoints[currentIndex] + YAxisRate; 
+    Serial.println("2");
+
+  // Update the data points array with the new value 
+  dataPoints[currentIndex] = YAxisRate; 
+  Serial.println("3");
+
+  // Increment the index and wrap around if necessary 
+  currentIndex = (currentIndex + 1) % windowSize; 
+  Serial.println("4");
+
+  // Calculate the moving average 
+  float movingAverage = (sum / windowSize) + 0.4;
+  Serial.println("5");
+
+  if (movingAverage < 0.15 && movingAverage > -0.15)
+  {
+    movingAverage = 0.0;
+  }
+  Serial.println("6");
+
+
+  float currentTime = millis();
+  Serial.println("7");
+
+  float delta_t = (currentTime - prevRollTime) / 1000;
+  Serial.println("8");
+
+  prevRollTime = currentTime;
+  Serial.println("9");
+
+  rollAngleGyro += (movingAverage) * delta_t;
+  Serial.println("10");
+
+
+  //Checks if within error of previous gyro angle
+  if (abs(rollAngleGyro - prevAngleGyro) < angleGyroStraightError) 
+  {
+    Serial.println("11");
+
+    //If sufficient time has passed where the gyro angle is the same
+    if (constantRollAngleSteps > maxConstantRollAngleSteps)
+    {
+      Serial.println("12");
+
+      if (prevAngleGyro > 15 || prevAngleGyro < -15)
+      {
+        angleGyroCorrectionAmt = angleGyroCorrectionLow;
+      }
+      else
+      {
+        angleGyroCorrectionAmt = angleGyroCorrectionHigh;
+      }
+      Serial.println("13");
+
+      //Slowly remove the drift as we approach 0.0 gyro angle
+      if (rollAngleGyro > 0)
+      {
+        rollAngleGyro -= angleGyroCorrectionAmt;
+      }
+      else if (rollAngleGyro < 0)
+      {
+        rollAngleGyro += angleGyroCorrectionAmt;
+      }
+      else if (rollAngleGyro < 0.1 && rollAngleGyro < -0.1)
+      {
+        constantRollAngleSteps = 0;
+        prevAngleGyro = rollAngleGyro;
+      }
+      Serial.println("14");
+
+    }
+    constantRollAngleSteps++;
+    Serial.println("15");
+
+  }
+  else
+  {
+    Serial.println("--16");
+
+    prevAngleGyro = rollAngleGyro;
+  }
+
+
+  // // Print the moving average to the Serial Monitor 
+  // Serial.printf("Moving Average: %f\n", movingAverage);
+  // Serial.printf("Current Roll Angle: %f\n", rollAngleGyro);
 }

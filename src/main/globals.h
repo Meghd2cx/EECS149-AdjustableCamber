@@ -6,7 +6,7 @@
 #define M1_PWM 33
 #define M1_SENSOR_A 25
 #define M1_SENSOR_B 34
-#define BTN 4
+#define BTN 39
 
 /** STATE MACHINE VARIABLES  */
 

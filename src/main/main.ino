@@ -92,7 +92,8 @@ void loop() {
 
         // // Popualte steering and IMU data
         populate_steering_data();
-        // updateIMUangAccel();
+        updateIMUangAccel();
+        // rollAngle = rollAngleGyro;
         // updateIMUAccel();
 
         // rollAngle = (GyroConstant) * rollAngleGyro + (1 - GyroConstant) * rollAngleAccel;
@@ -233,3 +234,5 @@ void fallBackStateMachine() {
     plotControlData();
 
 }
+
+
